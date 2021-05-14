@@ -20,7 +20,6 @@ class Database {
 
   async write(collectionData, document) {
     const { collection, id } = collectionData;
-    const data = { ...document };
 
     // Validations
     if (!collection) {
@@ -33,7 +32,7 @@ class Database {
 
     // Write to database
     try {
-      await this.db.collection(collection).doc(id).set(data);
+      await this.db.collection(collection).doc(id).set(document);
     } catch (error) {
       console.error(error);
     }
@@ -67,7 +66,7 @@ class Database {
       return cachedData;
     }
 
-    // If not in cache, query database. Return if found
+    // If not in cache, query database
     let doc;
     try {
       doc = await this.db.collection(collection).doc(id).get();
