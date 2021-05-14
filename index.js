@@ -1,17 +1,26 @@
 const NodeCache = require("node-cache");
 const cache = new NodeCache();
+const Firestore = require("@google-cloud/firestore");
+
+const initializeFirebase = (project_id) => {
+  const db = new Firestore({
+    projectId: `${project_id}`,
+    keyFilename: `${process.argv[1]}/../keyfile.json`,
+  });
+  return db;
+};
 
 class Database {
-  constructor(project_id, cache_max_age = 3600, cache_allocated_memory = 64) {
-    this.project_id = project_id;
-    this.cache_max_age = cache_max_age;
-    this.cache_allocated_memory = cache_allocated_memory;
+  constructor(config) {
+    this.project_id = config.project_id;
+    this.cache_max_age = config.cache_max_age || 3600;
+    this.cache_allocated_memory = config.cache_allocated_memory || 64;
+    this.db = initializeFirebase(config.project_id);
   }
 
   async write(collectionData, document) {
     const { collection, id } = collectionData;
     const data = { ...document };
-    const cache_max_age = this.cache_max_age;
 
     // Validations
     if (!collection) {
@@ -23,10 +32,22 @@ class Database {
     }
 
     // Write to database
-    // const res = await db.collection(collection).doc(id).set(data);
+    try {
+      await this.db.collection(collection).doc(id).set(data);
+    } catch (error) {
+      console.error(error);
+    }
 
     // Write to cache
-    // cache.set({ id, document, cache_max_age });
+    cache.set(id, document, this.cache_max_age);
+
+    const cacheStats = cache.getStats();
+    const { ksize, vsize } = cacheStats;
+
+    // Delete if over the memory limit
+    if (ksize + vsize > this.cache_allocated_memory * 1000000) {
+      cache.del(id);
+    }
   }
 
   async readOne(collectionData) {
@@ -40,6 +61,11 @@ class Database {
     }
 
     // Check if document is in cache. Return if found
+    const cachedData = cache.get(id);
+
+    if (cachedData) {
+      return cachedData;
+    }
 
     // If not in cache, query database. Return if found
 
@@ -48,6 +74,7 @@ class Database {
 
   async readMany(collectionData, filters) {
     const { collection } = collectionData;
+    const matches = [];
 
     // Validations
     if (!collection) {
@@ -55,10 +82,38 @@ class Database {
     }
 
     // Check if documents are in cache. Return array if found.
+    const allKeys = cache.keys();
+    const allCacheData = mget([...allKeys]);
 
+    if (filters) {
+      for (const filter in filters) {
+        for (const key in allCacheData) {
+          const value = filters[filter];
+
+          if (
+            allCacheData[key].hasOwnProperty(value) &&
+            allCacheData[key][filter] === value
+          ) {
+            if (matches.indexOf(allCacheData[key] === -1)) {
+              matches.push(allCacheData[key]);
+            }
+          }
+        }
+      }
+      return matches;
+    }
     // If not in cache, query database. Return array if found.
+    // for (const filter in filters) {
+    //   const res = db
+    //     .collection(collection)
+    //     .where(filter, "==", filters[filter]);
 
-    // If document doesn't exist, throw error
+    //   if (matches.indexOf(res) === -1) {
+    //     matches.push(res);
+    //   }
+    // }
+
+    // return matches;
   }
 }
 
