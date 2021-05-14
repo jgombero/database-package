@@ -68,8 +68,21 @@ class Database {
     }
 
     // If not in cache, query database. Return if found
+    let doc;
+    try {
+      doc = await this.db.collection(collection).doc(id).get();
+    } catch (error) {
+      console.error(error);
+    }
 
     // If document doesn't exist, throw error
+    if (!doc.exists) {
+      throw Error(
+        `No document found in collection: ${collection} with id: ${id}`
+      );
+    }
+
+    return doc.data();
   }
 
   async readMany(collectionData, filters) {
