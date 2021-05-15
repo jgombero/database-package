@@ -1,6 +1,7 @@
 const NodeCache = require("node-cache");
 const cache = new NodeCache();
 const Firestore = require("@google-cloud/firestore");
+const sizeof = require("object-sizeof");
 
 const initializeFirebase = (project_id) => {
   const db = new Firestore({
@@ -34,20 +35,19 @@ class Database {
     try {
       await this.db.collection(collection).doc(id).set(document);
     } catch (error) {
-      console.error(error);
+      throw Error(`Error: ${error}`);
     }
 
-    // TODO: See if I can check if the cache will be over the max allocated memory BEFORE writing to it
+    // Check if cache memory is full before adding document
+    const allKeys = cache.keys();
+    const allCacheData = cache.mget([...allKeys]);
 
-    // Write to cache
-    cache.set(id, document, this.cache_max_age);
-
-    const cacheStats = cache.getStats();
-    const { ksize, vsize } = cacheStats;
-
-    // Delete if over the memory limit
-    if (ksize + vsize > this.cache_allocated_memory * 1000000) {
-      cache.del(id);
+    if (
+      sizeof(allCacheData) + sizeof({ [id]: document }) <=
+      this.cache_allocated_memory * 1000000
+    ) {
+      // Write to cache
+      cache.set(id, document, this.cache_max_age);
     }
   }
 
@@ -73,7 +73,7 @@ class Database {
     try {
       doc = await this.db.collection(collection).doc(id).get();
     } catch (error) {
-      console.error(error);
+      throw Error(`Error: ${error}`);
     }
 
     // If document doesn't exist, throw error
