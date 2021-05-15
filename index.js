@@ -87,6 +87,7 @@ class Database {
   async readMany(collectionData, filters) {
     const { collection } = collectionData;
     const matches = [];
+    const matchIds = [];
 
     // Validations
     if (!collection) {
@@ -95,37 +96,39 @@ class Database {
 
     // Check if documents are in cache. Return array if found.
     const allKeys = cache.keys();
-    const allCacheData = mget([...allKeys]);
+    const allCacheData = cache.mget([...allKeys]);
 
     if (filters) {
       for (const filter in filters) {
         for (const key in allCacheData) {
           const value = filters[filter];
-
           if (
-            allCacheData[key].hasOwnProperty(value) &&
+            allCacheData[key].hasOwnProperty(filter) &&
             allCacheData[key][filter] === value
           ) {
-            if (matches.indexOf(allCacheData[key] === -1)) {
+            if (!matchIds.includes(key)) {
               matches.push(allCacheData[key]);
+              matchIds.push(key);
             }
           }
         }
       }
-      return matches;
     }
     // If not in cache, query database. Return array if found.
-    // for (const filter in filters) {
-    //   const res = db
-    //     .collection(collection)
-    //     .where(filter, "==", filters[filter]);
+    for (const key in filters) {
+      const res = await this.db
+        .collection(collection)
+        .where(key, "==", filters[key])
+        .get();
 
-    //   if (matches.indexOf(res) === -1) {
-    //     matches.push(res);
-    //   }
-    // }
-
-    // return matches;
+      res.forEach((doc) => {
+        if (!matchIds.includes(doc.id)) {
+          matches.push(doc.data());
+          matchIds.push(doc.id);
+        }
+      });
+    }
+    return matches;
   }
 }
 
