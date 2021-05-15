@@ -37,6 +37,8 @@ class Database {
       console.error(error);
     }
 
+    // TODO: See if I can check if the cache will be over the max allocated memory BEFORE writing to it
+
     // Write to cache
     cache.set(id, document, this.cache_max_age);
 
@@ -99,16 +101,16 @@ class Database {
     const allCacheData = cache.mget([...allKeys]);
 
     if (filters) {
-      for (const filter in filters) {
-        for (const key in allCacheData) {
-          const value = filters[filter];
+      for (const filtersKey in filters) {
+        for (const cacheKey in allCacheData) {
+          const value = filters[filtersKey];
           if (
-            allCacheData[key].hasOwnProperty(filter) &&
-            allCacheData[key][filter] === value
+            allCacheData[cacheKey].hasOwnProperty(filtersKey) &&
+            allCacheData[cacheKey][filtersKey] === value
           ) {
-            if (!matchIds.includes(key)) {
-              matches.push(allCacheData[key]);
-              matchIds.push(key);
+            if (!matchIds.includes(cacheKey)) {
+              matches.push(allCacheData[cacheKey]);
+              matchIds.push(cacheKey);
             }
           }
         }
