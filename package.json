@@ -1,13 +1,13 @@
 {
   "name": "@jgombero/database-package",
   "version": "1.0.0",
-  "description": "",
+  "description": "A mini ORM to read and write data to and from a GCP firebase database",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
-  "author": "",
+  "author": "Joshua Gomberoff",
   "license": "ISC",
   "dependencies": {
     "@google-cloud/firestore": "^4.11.1",
