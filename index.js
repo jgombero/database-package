@@ -31,9 +31,11 @@ class Database {
       throw Error("No document received");
     }
 
+    const customId = `${collection}-${id}`;
+
     // Write to database
     try {
-      await this.db.collection(collection).doc(id).set(document);
+      await this.db.collection(collection).doc(customId).set(document);
     } catch (error) {
       throw Error(`Error: ${error}`);
     }
@@ -43,11 +45,11 @@ class Database {
     const allCacheData = cache.mget([...allKeys]);
 
     if (
-      sizeof(allCacheData) + sizeof({ [id]: document }) <=
+      sizeof(allCacheData) + sizeof({ [customId]: document }) <=
       this.cache_allocated_memory * 1000000
     ) {
       // Write to cache
-      cache.set(id, document, this.cache_max_age);
+      cache.set(customId, document, this.cache_max_age);
     }
   }
 
@@ -61,8 +63,10 @@ class Database {
       throw Error("No id received");
     }
 
+    const customId = `${collection}-${id}`;
+
     // Check if document is in cache. Return if found
-    const cachedData = cache.get(id);
+    const cachedData = cache.get(customId);
 
     if (cachedData) {
       return cachedData;
@@ -71,7 +75,7 @@ class Database {
     // If not in cache, query database
     let doc;
     try {
-      doc = await this.db.collection(collection).doc(id).get();
+      doc = await this.db.collection(collection).doc(customId).get();
     } catch (error) {
       throw Error(`Error: ${error}`);
     }
@@ -100,7 +104,25 @@ class Database {
     const allKeys = cache.keys();
     const allCacheData = cache.mget([...allKeys]);
 
-    if (filters) {
+    // If filter object is empty
+    if (Object.keys(filters).length === 0 && filters.constructor === Object) {
+      // Check cache first
+      for (const cacheKey in allCacheData) {
+        if (cacheKey.search(collection) !== -1) {
+          matches.push(allCacheData[cacheKey]);
+          matchIds.push(cacheKey);
+        }
+      }
+      // Then check database
+      const example = await this.db.collection(collection).get();
+      example.forEach((doc) => {
+        if (!matchIds.includes(doc.id)) {
+          matches.push(doc.data());
+          matchIds.push(doc.id);
+        }
+      });
+      // If filter object is populated
+    } else {
       for (const filtersKey in filters) {
         for (const cacheKey in allCacheData) {
           const value = filters[filtersKey];
@@ -115,21 +137,22 @@ class Database {
           }
         }
       }
-    }
-    // If not in cache, query database. Return array if found.
-    for (const key in filters) {
-      const res = await this.db
-        .collection(collection)
-        .where(key, "==", filters[key])
-        .get();
+      // If not in cache, query database. Return array if found.
+      for (const key in filters) {
+        const res = await this.db
+          .collection(collection)
+          .where(key, "==", filters[key])
+          .get();
 
-      res.forEach((doc) => {
-        if (!matchIds.includes(doc.id)) {
-          matches.push(doc.data());
-          matchIds.push(doc.id);
-        }
-      });
+        res.forEach((doc) => {
+          if (!matchIds.includes(doc.id)) {
+            matches.push(doc.data());
+            matchIds.push(doc.id);
+          }
+        });
+      }
     }
+
     return matches;
   }
 }
