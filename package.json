@@ -1,6 +1,6 @@
 {
   "name": "@jgombero/database-package",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A mini ORM to read and write data to and from a GCP firebase database",
   "main": "index.js",
   "scripts": {
